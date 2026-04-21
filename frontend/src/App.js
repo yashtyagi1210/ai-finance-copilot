@@ -5,32 +5,39 @@ function App() {
   const [expenses, setExpenses] = useState("");
   const [insight, setInsight] = useState("");
 
-  // ✅ convert text → structured data
+  // ✅ Convert text → structured data safely
   const parseExpenses = (text) => {
-    return text.split("\n").map(line => {
-      const [category, amount] = line.split("-");
-      return {
-        category: category.trim(),
-        amount: Number(amount.trim())
-      };
-    });
+    return text
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => {
+        const [category, amount] = line.split("-");
+
+        return {
+          category: category ? category.trim() : "Unknown",
+          amount: amount ? Number(amount.trim()) : 0,
+        };
+      });
   };
 
+  // ✅ Call backend API
   const handleAnalyze = async () => {
     try {
       setInsight("Analyzing...");
 
-      const parsed = parseExpenses(expenses);
+      const parsedExpenses = parseExpenses(expenses);
 
-      const res = await axios.post("http://localhost:5001/analyze", {
-        expenses: parsed,
-      });
+      const res = await axios.post(
+        "https://ai-finance-copilot-backend.onrender.com/analyze",
+        {
+          expenses: parsedExpenses,
+        }
+      );
 
-      setInsight(res.data.insight || "Generating insights...");
-
+      setInsight(res.data.insight || "No insights received");
     } catch (err) {
-      console.error(err);
-      setInsight("Error connecting to backend");
+      console.error("Backend error:", err.message);
+      setInsight("Error connecting to backend ❌");
     }
   };
 
@@ -41,7 +48,7 @@ function App() {
       <textarea
         rows="6"
         cols="50"
-        placeholder={`Enter like:
+        placeholder={`Enter expenses like:
 Food - 3000
 Rent - 8000
 Travel - 1000`}
@@ -49,18 +56,14 @@ Travel - 1000`}
         onChange={(e) => setExpenses(e.target.value)}
       />
 
-      <br /><br />
+      <br />
+      <br />
 
-      <button onClick={handleAnalyze}>
-        Analyze
-      </button>
+      <button onClick={handleAnalyze}>Analyze</button>
 
       <h3>Insight:</h3>
 
-      {/* ✅ important for line breaks */}
-      <p style={{ whiteSpace: "pre-line" }}>
-        {insight}
-      </p>
+      <p style={{ whiteSpace: "pre-line" }}>{insight}</p>
     </div>
   );
 }
