@@ -88,3 +88,12 @@ python app.py
 ## ⭐ Note
 
 This project is built for learning purposes and aims to help users manage their personal finances more effectively.
+
+## 🌐 Live Demo
+https://ai-finance-copilot-gzgi.vercel.app
+
+## 📦 Repository
+https://github.com/yashtyagi1210/ai-finance-copilot
+---
+
+⭐ Built with ❤️ by Yashtyagi
