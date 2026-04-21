@@ -6,29 +6,46 @@ import OpenAI from "openai";
 dotenv.config();
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// OpenAI setup
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Health check route (useful for Render + debugging)
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "Backend is running" });
+});
+
+// Main analyze route
 app.post("/analyze", async (req, res) => {
-  const { expenses } = req.body;
+  try {
+    const { expenses } = req.body;
 
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+    // Safety check
+    if (!expenses || !Array.isArray(expenses)) {
+      return res.status(400).json({
+        error: "Invalid expenses data",
+      });
+    }
 
-  const breakdown = expenses.map(e => ({
-    ...e,
-    percent: ((e.amount / total) * 100).toFixed(1),
-  }));
+    const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
-  const prompt = `
+    const breakdown = expenses.map((e) => ({
+      ...e,
+      percent: total ? ((e.amount / total) * 100).toFixed(1) : "0",
+    }));
+
+    const prompt = `
 Analyze these expenses and give 3 short financial insights:
 ${JSON.stringify(breakdown)}
 `;
 
-  try {
+    // OpenAI call
     const response = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [{ role: "user", content: prompt }],
@@ -41,17 +58,24 @@ ${JSON.stringify(breakdown)}
   } catch (err) {
     console.error("AI ERROR:", err.message);
 
-    // ✅ fallback logic
+    // Fallback logic (if OpenAI fails)
     let insights = [];
 
-    breakdown.forEach(e => {
-      if (e.category.toLowerCase() === "food" && e.percent > 30) {
-        insights.push(`You spend ${e.percent}% on food — above average.`);
-        insights.push(`You can save ₹${Math.round(e.amount * 0.2)} per month by reducing dining.`);
-      } else if (e.category.toLowerCase() === "rent") {
-        insights.push(`Rent takes up ${e.percent}% of your budget, which is reasonable.`);
+    const { expenses } = req.body || [];
+    const total = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+
+    (expenses || []).forEach((e) => {
+      const percent = total ? ((e.amount / total) * 100).toFixed(1) : 0;
+
+      if (e.category?.toLowerCase() === "food" && percent > 30) {
+        insights.push(`You spend ${percent}% on food — above average.`);
+        insights.push(
+          `You can save ₹${Math.round(e.amount * 0.2)} by reducing dining.`
+        );
+      } else if (e.category?.toLowerCase() === "rent") {
+        insights.push(`Rent takes ${percent}% of your budget.`);
       } else {
-        insights.push(`${e.category} accounts for ${e.percent}% of your spending.`);
+        insights.push(`${e.category} accounts for ${percent}% spending.`);
       }
     });
 
@@ -61,4 +85,9 @@ ${JSON.stringify(breakdown)}
   }
 });
 
-app.listen(5001, () => console.log("Server running on port 5001"));
+// FIXED PORT for Render
+const PORT = process.env.PORT || 5001;
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
